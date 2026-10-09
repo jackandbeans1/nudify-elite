@@ -3,7 +3,7 @@ import argparse, os, uvicorn
 
 def main() -> None:
     ap = argparse.ArgumentParser(prog="nudify-elite")
-    ap.add_argument("--host", default="127.0.0.1")
+    ap.add_argument("--host", default="0.0.0.0")
     ap.add_argument("--port", type=int, default=8000)
     ap.add_argument("--warm", action="store_true")
     args = ap.parse_args()
