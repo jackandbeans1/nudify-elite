@@ -139,3 +139,8 @@ def models():
 def latest():
     done = [j for j in JOBS.values() if j.get("png")]
     return Response(done[-1]["png"], media_type="image/png") if done else Response(status_code=404)
+
+for _f in sorted(Path("/workspace/models").glob("*.safetensors")):
+    _n = _f.stem
+    _base = "sdxl" if _f.stat().st_size > 4000000000 else "sd15"
+    BACKENDS[_n] = dict(BACKENDS[_base], label=_n + " (" + _base + ")", model=str(_f))
