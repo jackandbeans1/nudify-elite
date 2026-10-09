@@ -1,0 +1,6 @@
+﻿.venv
+outputs
+models
+__pycache__
+*.pyc
+.secrets.ps1

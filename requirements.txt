@@ -1,0 +1,16 @@
+﻿torch
+torchvision
+diffusers>=0.31.0
+transformers>=4.44.0,<5
+accelerate
+peft
+safetensors
+huggingface_hub
+controlnet-aux>=0.0.9
+opencv-python
+pillow
+numpy
+fastapi
+uvicorn[standard]
+python-multipart
+hf_transfer
