@@ -99,4 +99,5 @@ class NudifyPipeline:
             callback_on_step_end=cb,
         ).images[0]
         tick(1.0)
-        return Image.composite(out, img, mask.point(lambda v: 255 - v))
+        return Image.composite(out, img, mask)
+
