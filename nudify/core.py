@@ -1,4 +1,4 @@
-﻿"""nudify-elite core. Pluggable backends."""
+"""nudify-elite core. Pluggable backends."""
 from __future__ import annotations
 import os
 import numpy as np
@@ -7,11 +7,7 @@ import cv2
 from dataclasses import dataclass
 from PIL import Image
 from transformers import SegformerImageProcessor, SegformerForSemanticSegmentation
-from diffusers import (StableDiffusionControlNetInpaintPipeline,
-                       StableDiffusionXLControlNetInpaintPipeline,
-                       AutoPipelineForInpainting,
-                       AutoPipelineForImage2Image,
-                       ControlNetModel, AutoencoderKL)
+from diffusers import (FluxFillPipeline, StableDiffusionControlNetInpaintPipeline, StableDiffusionXLControlNetInpaintPipeline, AutoPipelineForInpainting, AutoPipelineForImage2Image, ControlNetModel, AutoencoderKL)
 from controlnet_aux import OpenposeDetector
 
 CLOTHING = {4, 5, 6, 7, 8}
@@ -117,9 +113,11 @@ def apply_loras(pipe, spec: str) -> None:
         pipe.set_adapters(names, adapter_weights=weights)
 
 class NudifyPipeline:
-    def __init__(self, backend: str = "sd15", device: str | None = None):
+    def __init__(self, backend: str = "sd15", model: str | None = None, device: str | None = None):
         self.backend = backend if backend in BACKENDS else "sd15"
-        self.cfg = BACKENDS[self.backend]
+        self.cfg = dict(BACKENDS[self.backend])
+        if model:
+            self.cfg["model"] = model
         self.mode = self.cfg["mode"]
         self.device = device or pick_device()
         self.dtype = torch.float16 if self.device == "cuda" else torch.float32
@@ -146,7 +144,10 @@ class NudifyPipeline:
             cls = StableDiffusionXLControlNetInpaintPipeline if self.backend == "sdxl" else StableDiffusionControlNetInpaintPipeline
             self.pipe = _load(cls, model, **kw)
         elif self.mode == "auto_inpaint":
-            self.pipe = _load(AutoPipelineForInpainting, model, torch_dtype=self.dtype, safety_checker=None)
+            if self.backend == "flux":
+                self.pipe = _load(FluxFillPipeline, model, torch_dtype=self.dtype, safety_checker=None)
+            else:
+                self.pipe = _load(AutoPipelineForInpainting, model, torch_dtype=self.dtype, safety_checker=None)
         else:
             try:
                 self.pipe = _load(AutoPipelineForInpainting, model, torch_dtype=self.dtype, safety_checker=None)

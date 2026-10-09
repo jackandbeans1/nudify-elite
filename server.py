@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 import gc, json, queue, threading, traceback, uuid
 from io import BytesIO
 from pathlib import Path
