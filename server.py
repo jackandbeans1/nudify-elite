@@ -1,29 +1,37 @@
 ﻿from __future__ import annotations
-import json, queue, threading, traceback, uuid
+import gc, json, queue, threading, traceback, uuid
 from io import BytesIO
 from pathlib import Path
 from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.responses import Response, FileResponse, StreamingResponse
 from PIL import Image
+import torch
 import auth
 from nudify.core import NudifyPipeline, Params
 
 app = FastAPI(title="nudify-elite")
 auth.install(app)
 STATIC = Path(__file__).parent / "static"
-PIPE = None
+_pipe = None
+_pipe_tier = None
 JOBS: dict = {}
 LOCK = threading.Lock()
 
-def get_pipe() -> NudifyPipeline:
-    global PIPE
-    if PIPE is None:
-        PIPE = NudifyPipeline()
-    return PIPE
+def get_pipe(tier: str) -> NudifyPipeline:
+    global _pipe, _pipe_tier
+    if _pipe is None or _pipe_tier != tier:
+        if _pipe is not None:
+            del _pipe
+            gc.collect()
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+        _pipe = NudifyPipeline(tier=tier)
+        _pipe_tier = tier
+    return _pipe
 
 @app.on_event("startup")
 def _warm():
-    get_pipe()
+    get_pipe("sd15")
 
 def _new_job() -> str:
     jid = uuid.uuid4().hex[:12]
@@ -45,7 +53,7 @@ def _set(jid: str, **kw):
 def _run(jid: str, img: Image.Image, params: Params):
     _set(jid, status="running", progress=0.01)
     try:
-        out = get_pipe().run(img, params, progress=lambda v: _set(jid, progress=round(v, 4)))
+        out = get_pipe(params.tier).run(img, params, progress=lambda v: _set(jid, progress=round(v, 4)))
         buf = BytesIO(); out.save(buf, "PNG")
         _set(jid, status="done", progress=1.0, png=buf.getvalue())
     except Exception as e:
@@ -60,12 +68,15 @@ async def nudify(
     file: UploadFile = File(...),
     prompt: str = Form(Params.prompt),
     negative: str = Form(Params.negative),
-    steps: int = Form(8),
-    guidance: float = Form(1.8),
+    tier: str = Form("sd15"),
+    loras: str = Form(""),
+    steps: int = Form(0),
+    guidance: float = Form(0.0),
     seed: int = Form(-1),
 ):
     img = Image.open(BytesIO(await file.read())).convert("RGB")
-    p = Params(prompt=prompt, negative=negative, steps=steps, guidance=guidance, seed=seed)
+    p = Params(prompt=prompt, negative=negative, tier=tier, loras=loras,
+               steps=steps, guidance=guidance, seed=seed)
     jid = _new_job()
     threading.Thread(target=_run, args=(jid, img, p), daemon=True).start()
     return {"job_id": jid}
