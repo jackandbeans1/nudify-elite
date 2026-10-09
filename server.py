@@ -124,3 +124,18 @@ def result(jid: str):
             return {"status": j["status"], "progress": j["progress"], "error": j["error"]}
         png = j["png"]
     return Response(png, media_type="image/png")
+
+import os
+OUTDIR = Path(os.getenv("OUTDIR", "/workspace/outputs"))
+MODELS_DIR = Path(os.getenv("MODELS_DIR", "/workspace/models"))
+OUTDIR.mkdir(parents=True, exist_ok=True)
+@app.get("/models")
+def models():
+    out = []
+    for p in sorted(MODELS_DIR.glob("*.safetensors")):
+        out.append({"path": str(p), "name": p.name, "gb": round(p.stat().st_size/1073741824, 2)})
+    return out
+@app.get("/latest")
+def latest():
+    done = [j for j in JOBS.values() if j.get("png")]
+    return Response(done[-1]["png"], media_type="image/png") if done else Response(status_code=404)
